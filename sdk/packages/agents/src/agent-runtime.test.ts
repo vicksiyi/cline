@@ -171,7 +171,7 @@ describe("AgentRuntime", () => {
 		).toBe(true);
 	});
 
-	it("injects pending user messages before prepareTurn rewrites the transcript", async () => {
+	it("injects pending user messages before prepareTurn projects the provider request", async () => {
 		const consumePendingUserMessage = vi.fn(() => "steer before prepare");
 		const prepareTurn = vi.fn(
 			(context: { messages: readonly AgentMessage[] }) => ({
@@ -225,7 +225,7 @@ describe("AgentRuntime", () => {
 		});
 	});
 
-	it("lets prepareTurn compact tool results after pending user input is added", async () => {
+	it("lets prepareTurn project tool results after pending user input is added", async () => {
 		const consumePendingUserMessage = vi.fn(() => "latest steering");
 		const hugeToolOutput = "x".repeat(100_000);
 		const prepareTurn = vi.fn(
@@ -969,11 +969,11 @@ describe("AgentRuntime", () => {
 		expect(model.requests).toHaveLength(0);
 	});
 
-	it("runs prepareTurn before beforeModel without overwriting canonical messages", async () => {
-		const compactedMessage: AgentMessage = {
-			id: "msg_compacted",
+	it("projects the provider request without overwriting canonical messages", async () => {
+		const projectedMessage: AgentMessage = {
+			id: "msg_projected",
 			role: "user",
-			content: [{ type: "text", text: "compacted context" }],
+			content: [{ type: "text", text: "projected context" }],
 			createdAt: 1,
 		};
 		const notices: string[] = [];
@@ -986,19 +986,19 @@ describe("AgentRuntime", () => {
 				reason: "auto_compaction",
 			});
 			return {
-				messages: [compactedMessage],
-				systemPrompt: "compacted system",
+				messages: [projectedMessage],
+				systemPrompt: "projected system",
 			};
 		});
 		const beforeModel = vi.fn(({ request }) => {
-			expect(request.systemPrompt).toBe("compacted system");
-			expect(request.messages).toEqual([compactedMessage]);
+			expect(request.systemPrompt).toBe("projected system");
+			expect(request.messages).toEqual([projectedMessage]);
 			return undefined;
 		});
 		const model = new ScriptedModel([
 			(request) => {
-				expect(request.systemPrompt).toBe("compacted system");
-				expect(request.messages).toEqual([compactedMessage]);
+				expect(request.systemPrompt).toBe("projected system");
+				expect(request.messages).toEqual([projectedMessage]);
 				return [
 					{ type: "text-delta", text: "done" },
 					{ type: "finish", reason: "stop" },
@@ -1022,11 +1022,13 @@ describe("AgentRuntime", () => {
 		expect(prepareTurn).toHaveBeenCalledTimes(1);
 		expect(beforeModel).toHaveBeenCalledTimes(1);
 		expect(notices).toEqual(["auto-compacting"]);
+		expect(model.requests[0]?.messages).toEqual([projectedMessage]);
 		expect(result.messages[0]).toMatchObject({
 			role: "user",
 			content: [{ type: "text", text: "large context" }],
 		});
 		expect(result.messages).toHaveLength(2);
+		expect(result.messages).not.toContainEqual(projectedMessage);
 		expect(model.requests).toHaveLength(1);
 	});
 
@@ -1072,16 +1074,16 @@ describe("AgentRuntime", () => {
 	});
 
 	it("preserves the existing system prompt when prepareTurn returns only messages", async () => {
-		const compactedMessage: AgentMessage = {
-			id: "msg_compacted",
+		const projectedMessage: AgentMessage = {
+			id: "msg_projected",
 			role: "user",
-			content: [{ type: "text", text: "compacted context" }],
+			content: [{ type: "text", text: "projected context" }],
 			createdAt: 1,
 		};
 		const model = new ScriptedModel([
 			(request) => {
 				expect(request.systemPrompt).toBe("original system");
-				expect(request.messages).toEqual([compactedMessage]);
+				expect(request.messages).toEqual([projectedMessage]);
 				return [
 					{ type: "text-delta", text: "done" },
 					{ type: "finish", reason: "stop" },
@@ -1091,7 +1093,7 @@ describe("AgentRuntime", () => {
 		const runtime = new AgentRuntime({
 			model,
 			systemPrompt: "original system",
-			prepareTurn: () => ({ messages: [compactedMessage] }),
+			prepareTurn: () => ({ messages: [projectedMessage] }),
 		});
 
 		await runtime.run("large context");
