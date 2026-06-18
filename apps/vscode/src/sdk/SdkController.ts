@@ -816,6 +816,7 @@ export class Controller {
 		)
 		const serializedError = clineError.serialize()
 
+		const failedAskTs = ts + 2
 		const messages: ClineMessage[] = [
 			{
 				ts,
@@ -834,13 +835,15 @@ export class Controller {
 				partial: false,
 			},
 			{
-				ts: ts + 2,
+				ts: failedAskTs,
 				type: "ask",
 				ask: "api_req_failed",
 				text: serializedError,
 				partial: false,
 			},
 		]
+
+		this.turnStateTracker.set("error", failedAskTs)
 
 		this.messages.appendAndEmit(messages, {
 			type: "status",
@@ -885,6 +888,7 @@ export class Controller {
 			message: rawErrorMessage,
 		})
 
+		const failedAskTs = ts + 1
 		const messages: ClineMessage[] = [
 			{
 				ts,
@@ -896,13 +900,15 @@ export class Controller {
 				partial: false,
 			},
 			{
-				ts: ts + 1,
+				ts: failedAskTs,
 				type: "ask",
 				ask: "api_req_failed",
 				text: serializedError,
 				partial: false,
 			},
 		]
+
+		this.turnStateTracker.set("error", failedAskTs)
 
 		this.messages.appendAndEmit(messages, {
 			type: "status",
